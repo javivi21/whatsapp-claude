@@ -5,7 +5,7 @@ function cfg_asistente() { return @include __DIR__ . '/config_asistente.php'; }
 function token_wa() { $c = @include __DIR__ . '/config.php'; return preg_replace('/\s+/', '', $c['token'] ?? ''); }
 function phone_id_wa() { $c = @include __DIR__ . '/config.php'; return $c['phone_id'] ?? ''; }
 function api_base_wa() { $c = @include __DIR__ . '/config.php'; return $c['api_base'] ?? 'https://graph.facebook.com/v21.0'; }
-function api_claude() { return cfg_asistente()['api_claude'] ?? 'https://api.anthropic.com/v1/messages'; }
+function api_claude() { return cfg_asistente()['api_claude'] ?? ((@include __DIR__ . '/config.php')['api_claude'] ?? 'https://api.anthropic.com/v1/messages'); }
 function dueno_nombre() { return cfg_asistente()['nombre'] ?? 'el dueño'; }
 function dominio_correo() { $c = cfg_asistente(); return $c['dominio_correo'] ?? (substr(strrchr((string)($c['gmail_user'] ?? ''), '@') ?: '@localhost', 1)); }
 // Sustituye {DUENO} y {PERFIL} en los textos que van a Claude.
@@ -27,7 +27,7 @@ function wa_enviar($tel, $texto) {
 }
 
 function claude($sistema, $mensajes) {
-    $k = cfg_asistente()['anthropic_key'] ?? '';
+    $k = cfg_asistente()['anthropic_key'] ?? ((@include __DIR__ . '/config.php')['anthropic_key'] ?? ''); // también vale en config.php (modo clientes sin asistente del dueño)
     if (!$k || strpos($k, 'PEGAR') !== false) return 'Aún no tengo la clave de Claude en el servidor.';
     foreach ($mensajes as &$m) if (is_string($m['content'])) $m['content'] = personalizar($m['content']);
     unset($m);

@@ -20,7 +20,14 @@ file_put_contents($tmp . '/meta/router.php', <<<'PHP'
 $ia = strpos($_SERVER['REQUEST_URI'], '/v1/messages') === 0;
 file_put_contents(__DIR__ . ($ia ? '/claude.jsonl' : '/capturados.jsonl'), file_get_contents('php://input') . "\n", FILE_APPEND);
 header('Content-Type: application/json');
-echo $ia ? json_encode(['content' => [['type' => 'text', 'text' => 'Respuesta falsa de Claude']]]) : '{"messages":[{"id":"wamid.fake"}]}';
+$in = json_decode(file_get_contents('php://input'), true); $ult = end($in['messages'])['content'] ?? ''; $sis = $in['system'][0]['text'] ?? '';
+if ($ia && strpos($sis, 'CATÁLOGO') !== false) {
+    $r = stripos($ult, 'camiseta') !== false
+        ? ['respuesta' => 'Anotado', 'accion' => 'pedido', 'items' => [['id' => '1', 'cantidad' => 2], ['id' => '99', 'cantidad' => 5], ['id' => '2', 'cantidad' => 0], ['id' => '1', 'cantidad' => 1, 'precio' => 0.01]]]
+        : (stripos($ult, 'devolver') !== false ? ['respuesta' => 'Te paso con una persona', 'accion' => 'humano'] : ['respuesta' => 'Respuesta falsa de Claude', 'accion' => 'ninguna']);
+    $t = json_encode($r);
+} else $t = 'Respuesta falsa de Claude';
+echo $ia ? json_encode(['content' => [['type' => 'text', 'text' => $t]]]) : '{"messages":[{"id":"wamid.fake"}]}';
 PHP);
 file_put_contents($tmp . '/app/config_asistente.php', '<?php return ' . var_export([
     'owner' => '34699000111', 'anthropic_key' => 'CLAVE_FALSA', 'api_claude' => "http://127.0.0.1:$puertoMeta/v1/messages",
@@ -32,6 +39,18 @@ function arrancar($puerto, $dir, $router = null) {
     $p = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['file', "$dir/server.log", 'a'], 2 => ['file', "$dir/server.log", 'a']], $pipes);
     return [$p, $pipes];
 }
+@mkdir($tmp . '/app2', 0777, true);
+foreach (glob($raiz . '/php/*.php') as $f) copy($f, $tmp . '/app2/' . basename($f));
+$puertoIA = 18083;
+file_put_contents($tmp . '/app2/config.php', '<?php return ' . var_export([
+    'verify' => 'v', 'token' => 'T', 'phone_id' => '111', 'app_secret' => $secreto, 'api_base' => "http://127.0.0.1:$puertoMeta/v21.0",
+    'negocio' => 'Tienda de Prueba', 'dueno' => 'Ana', 'ia_clientes' => true, 'anthropic_key' => 'CLAVE_FALSA',
+    'api_claude' => "http://127.0.0.1:$puertoMeta/v1/messages", 'aviso' => '34699000111', 'max_msgs_hora' => 6,
+    'catalogo' => ['1' => ['nombre' => 'Camiseta', 'precio' => 12.5, 'desc' => 'Algodón'], '2' => ['nombre' => 'Gorra', 'precio' => 8, 'desc' => 'Ajustable']],
+    'info' => 'Envíos en 48 horas.',
+], true) . ';');
+file_put_contents($tmp . '/app2/config_asistente.php', '<?php return ["owner" => "34699000111"];');
+[$pIA] = arrancar($puertoIA, $tmp . '/app2');
 [$pApp] = arrancar($puertoApp, $tmp . '/app');
 [$pMeta] = arrancar($puertoMeta, $tmp . '/meta', $tmp . '/meta/router.php');
 usleep(800000);
@@ -113,9 +132,27 @@ prueba('las instrucciones llevan cache_control', ($sis['cache_control']['type'] 
 prueba('se personaliza con nombre y perfil', str_contains($sis['text'] ?? '', 'Ana') && str_contains($sis['text'] ?? '', 'peluquera en Madrid') && !str_contains($sis['text'] ?? '', '{'), $sis['text'] ?? '');
 prueba('el código no lleva datos personales del autor', !preg_match('/Javi|Luis|luiart|León/u', file_get_contents($tmp . '/app/asistente.php')));
 
+echo "Clientes con IA: pedidos\n";
+$c0 = count(capturados($tmp));
+post($tmp, $puertoIA, $secreto, msg('wamid.F1', 'text', 'Quiero camisetas', '34611000222'));
+$cap = capturados($tmp); $ult = end($cap)['text']['body'] ?? '';
+prueba('propone el pedido con total calculado en el servidor (3 x 12,5 = 37,5 €)', str_contains($ult, '3 x Camiseta') && str_contains($ult, '37,5 €') && !str_contains($ult, 'Gorra') && count($cap) === $c0 + 1, $ult);
+post($tmp, $puertoIA, $secreto, msg('wamid.F2', 'text', 'si', '34611000222'));
+$cap = capturados($tmp);
+$ped = is_file($tmp . '/app2/pedidos.jsonl') ? json_decode(trim(file_get_contents($tmp . '/app2/pedidos.jsonl')), true) : null;
+prueba('al confirmar guarda el pedido', ($ped['total'] ?? 0) == 37.5 && ($ped['tel'] ?? '') === '34611000222', json_encode($ped));
+prueba('avisa al dueño del pedido nuevo', str_contains($cap[count($cap) - 2]['text']['body'] ?? '', 'Nuevo pedido') && ($cap[count($cap) - 2]['to'] ?? '') === '34699000111', json_encode(array_slice($cap, -2)));
+prueba('confirma al cliente', str_contains(end($cap)['text']['body'] ?? '', 'recibido'));
+post($tmp, $puertoIA, $secreto, msg('wamid.F3', 'text', 'Quiero devolver algo', '34611000333'));
+$cap = capturados($tmp);
+prueba('pasa a una persona y avisa al dueño', str_contains($cap[count($cap) - 2]['text']['body'] ?? '', 'necesita a una persona') && str_contains(end($cap)['text']['body'] ?? '', 'persona'), json_encode(array_slice($cap, -2)));
+for ($i = 0; $i < 8; $i++) post($tmp, $puertoIA, $secreto, msg('wamid.G' . $i, 'text', 'hola ' . $i, '34611000444'));
+$cap = capturados($tmp);
+prueba('limita mensajes por hora', str_contains(end($cap)['text']['body'] ?? '', 'muchos mensajes'), end($cap)['text']['body'] ?? '');
+
 echo "Registro\n";
 prueba('log.txt existe y registra envíos', is_file($tmp . '/app/log.txt') && str_contains(file_get_contents($tmp . '/app/log.txt'), 'HTTP 200'));
 
-foreach ([$pApp, $pMeta] as $p) { proc_terminate($p); proc_close($p); }
+foreach ([$pApp, $pIA, $pMeta] as $p) { proc_terminate($p); proc_close($p); }
 echo "\n" . ($total - $fallos) . "/$total pruebas correctas\n";
 exit($fallos ? 1 : 0);

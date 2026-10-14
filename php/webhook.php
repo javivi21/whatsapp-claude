@@ -146,7 +146,8 @@ foreach (($d['entry'] ?? []) as $e) foreach (($e['changes'] ?? []) as $c)
                 try { asistente_memorizar($cuerpo, $resp); } catch (Throwable $ex) { } // memoria permanente, después de contestar
             } else {
                 $txt = preg_replace('/^reservas\b[,:\s]*/iu', '', trim($cuerpo));
-                $resp = responder($m['from'], $txt === '' ? 'hola' : $txt);
+                require_once __DIR__ . '/cliente.php';
+                $resp = clientes_ia_activa() ? cliente_responder($m['from'], $txt === '' ? 'hola' : $txt) : responder($m['from'], $txt === '' ? 'hola' : $txt);
                 enviar($cfg, $m['from'], $resp);
                 cliente_anotar($m['from'], $txt, $resp);
             }

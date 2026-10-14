@@ -11,6 +11,11 @@ Guía completa por fases: [PLAYBOOK.md](PLAYBOOK.md).
 - `tests/run.php`: pruebas automáticas con Meta y Anthropic falsos, sin red real.
 - `bot.js`, `test.js`: prototipo del flujo (`node test.js`).
 
+## Modos
+- **Menú sencillo** (por defecto): reservas por menú, sin IA.
+- **Clientes con Claude** (`ia_clientes`): Claude resuelve dudas, guía por el catálogo y recoge pedidos que el cliente confirma con SÍ. Los precios y totales los calcula el servidor, no la IA. Claude solo habla del negocio (Meta no admite asistentes generales). Los pedidos van a `pedidos.jsonl` y se avisa al móvil `aviso`. Límite de mensajes por cliente y hora.
+- **Asistente del dueño** (`config_asistente.php`): correo, memoria y resumen diario.
+
 ## Empezar (con Claude)
 Abre esta carpeta con Claude Code y di: "monta mi WhatsApp con este repo". Claude sigue `CLAUDE.md` y te guía. Las claves las escribes tú con `php setup.php`; Claude no las ve.
 
