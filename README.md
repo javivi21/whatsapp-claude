@@ -13,8 +13,11 @@ Guía completa por fases: [PLAYBOOK.md](PLAYBOOK.md).
 
 ## Modos
 - **Menú sencillo** (por defecto): reservas por menú, sin IA.
-- **Clientes con Claude** (`ia_clientes`): Claude resuelve dudas, guía por el catálogo y recoge pedidos que el cliente confirma con SÍ. Los precios y totales los calcula el servidor, no la IA. Claude solo habla del negocio (Meta no admite asistentes generales). Los pedidos van a `pedidos.jsonl` y se avisa al móvil `aviso`. Límite de mensajes por cliente y hora.
+- **Clientes con Claude** (`ia_clientes`): Claude conversa como una persona: resuelve dudas, recomienda del catálogo, pide los datos y cierra el pedido dentro del chat, sin menús ni comandos. Los precios y totales los calcula el servidor, no la IA. Claude solo habla del negocio (Meta no admite asistentes generales). Los pedidos van a `pedidos.jsonl` y se avisa al móvil `aviso`. Límite de mensajes por cliente y hora.
 - **Asistente del dueño** (`config_asistente.php`): correo, memoria y resumen diario.
+
+## Instalar en una empresa
+`php setup.php` pregunta el negocio, el catálogo (CSV de Excel), los datos de Meta y la clave de Anthropic, y deja el paquete listo en `instalar/`. Subes esa carpeta al hosting y pones el webhook en Meta. Se adapta a cualquier empresa cambiando `catalogo.csv`, `info` y `datos_pedido`. Incluye aviso de privacidad y comando BORRAR.
 
 ## Empezar (con Claude)
 Abre esta carpeta con Claude Code y di: "monta mi WhatsApp con este repo". Claude sigue `CLAUDE.md` y te guía. Las claves las escribes tú con `php setup.php`; Claude no las ve.

@@ -5,3 +5,6 @@ estado/
 reservas.jsonl
 *.env
 .env
+catalogo.csv
+pedidos.jsonl
+instalar/

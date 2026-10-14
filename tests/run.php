@@ -22,9 +22,12 @@ file_put_contents(__DIR__ . ($ia ? '/claude.jsonl' : '/capturados.jsonl'), file_
 header('Content-Type: application/json');
 $in = json_decode(file_get_contents('php://input'), true); $ult = end($in['messages'])['content'] ?? ''; $sis = $in['system'][0]['text'] ?? '';
 if ($ia && strpos($sis, 'CATÁLOGO') !== false) {
-    $r = stripos($ult, 'camiseta') !== false
-        ? ['respuesta' => 'Anotado', 'accion' => 'pedido', 'items' => [['id' => '1', 'cantidad' => 2], ['id' => '99', 'cantidad' => 5], ['id' => '2', 'cantidad' => 0], ['id' => '1', 'cantidad' => 1, 'precio' => 0.01]]]
-        : (stripos($ult, 'devolver') !== false ? ['respuesta' => 'Te paso con una persona', 'accion' => 'humano'] : ['respuesta' => 'Respuesta falsa de Claude', 'accion' => 'ninguna']);
+    $it = [['id' => '1', 'cantidad' => 3]];
+    if (stripos($ult, 'camiseta') !== false) $r = ['respuesta' => 'Anotado', 'accion' => 'pedido', 'items' => [['id' => '1', 'cantidad' => 2], ['id' => '99', 'cantidad' => 5], ['id' => '2', 'cantidad' => 0], ['id' => '1', 'cantidad' => 1, 'precio' => 0.01]]];
+    elseif (stripos($ult, 'sin datos') !== false) $r = ['respuesta' => 'Genial, lo cierro', 'accion' => 'finalizar', 'items' => $it, 'datos' => ['nombre' => 'Marta']];
+    elseif (stripos($ult, 'confirmo') !== false) $r = ['respuesta' => 'Perfecto, Marta', 'accion' => 'finalizar', 'items' => $it, 'datos' => ['nombre' => 'Marta', 'entrega' => 'Calle Falsa 1']];
+    elseif (stripos($ult, 'devolver') !== false) $r = ['respuesta' => 'Te paso con una persona', 'accion' => 'humano'];
+    else $r = ['respuesta' => 'Respuesta falsa de Claude', 'accion' => 'ninguna'];
     $t = json_encode($r);
 } else $t = 'Respuesta falsa de Claude';
 echo $ia ? json_encode(['content' => [['type' => 'text', 'text' => $t]]]) : '{"messages":[{"id":"wamid.fake"}]}';
@@ -46,10 +49,15 @@ file_put_contents($tmp . '/app2/config.php', '<?php return ' . var_export([
     'verify' => 'v', 'token' => 'T', 'phone_id' => '111', 'app_secret' => $secreto, 'api_base' => "http://127.0.0.1:$puertoMeta/v21.0",
     'negocio' => 'Tienda de Prueba', 'dueno' => 'Ana', 'ia_clientes' => true, 'anthropic_key' => 'CLAVE_FALSA',
     'api_claude' => "http://127.0.0.1:$puertoMeta/v1/messages", 'aviso' => '34699000111', 'max_msgs_hora' => 6,
-    'catalogo' => ['1' => ['nombre' => 'Camiseta', 'precio' => 12.5, 'desc' => 'Algodón'], '2' => ['nombre' => 'Gorra', 'precio' => 8, 'desc' => 'Ajustable']],
+    'catalogo_csv' => 'catalogo.csv',
     'info' => 'Envíos en 48 horas.',
 ], true) . ';');
 file_put_contents($tmp . '/app2/config_asistente.php', '<?php return ["owner" => "34699000111"];');
+file_put_contents($tmp . '/app2/catalogo.csv', "﻿id;nombre;precio;descripcion
+1;Camiseta;12,50;Algodón
+2;Gorra;8;Ajustable
+3;Sin precio;;x
+");
 [$pIA] = arrancar($puertoIA, $tmp . '/app2');
 [$pApp] = arrancar($puertoApp, $tmp . '/app');
 [$pMeta] = arrancar($puertoMeta, $tmp . '/meta', $tmp . '/meta/router.php');
@@ -137,7 +145,13 @@ $c0 = count(capturados($tmp));
 post($tmp, $puertoIA, $secreto, msg('wamid.F1', 'text', 'Quiero camisetas', '34611000222'));
 $cap = capturados($tmp); $ult = end($cap)['text']['body'] ?? '';
 prueba('propone el pedido con total calculado en el servidor (3 x 12,5 = 37,5 €)', str_contains($ult, '3 x Camiseta') && str_contains($ult, '37,5 €') && !str_contains($ult, 'Gorra') && count($cap) === $c0 + 1, $ult);
-post($tmp, $puertoIA, $secreto, msg('wamid.F2', 'text', 'si', '34611000222'));
+$ult1 = $ult;
+post($tmp, $puertoIA, $secreto, msg('wamid.F2a', 'text', 'vale, sin datos', '34611000222'));
+$cap = capturados($tmp);
+prueba('no cierra el pedido si faltan datos y los pide', !is_file($tmp . '/app2/pedidos.jsonl') && str_contains(end($cap)['text']['body'] ?? '', 'necesito la dirección'), end($cap)['text']['body'] ?? '');
+post($tmp, $puertoIA, $secreto, msg('wamid.F2b', 'text', 'confirmo', '34611000555'));
+prueba('no cierra un pedido que nadie ha anotado antes', !is_file($tmp . '/app2/pedidos.jsonl'));
+post($tmp, $puertoIA, $secreto, msg('wamid.F2', 'text', 'confirmo, gracias', '34611000222'));
 $cap = capturados($tmp);
 $ped = is_file($tmp . '/app2/pedidos.jsonl') ? json_decode(trim(file_get_contents($tmp . '/app2/pedidos.jsonl')), true) : null;
 prueba('al confirmar guarda el pedido', ($ped['total'] ?? 0) == 37.5 && ($ped['tel'] ?? '') === '34611000222', json_encode($ped));
@@ -149,6 +163,13 @@ prueba('pasa a una persona y avisa al dueño', str_contains($cap[count($cap) - 2
 for ($i = 0; $i < 8; $i++) post($tmp, $puertoIA, $secreto, msg('wamid.G' . $i, 'text', 'hola ' . $i, '34611000444'));
 $cap = capturados($tmp);
 prueba('limita mensajes por hora', str_contains(end($cap)['text']['body'] ?? '', 'muchos mensajes'), end($cap)['text']['body'] ?? '');
+
+echo "Clientes con IA: catálogo CSV, privacidad y borrado\n";
+prueba('el primer mensaje del cliente lleva aviso de privacidad', str_contains($ult1, 'inteligencia artificial') && str_contains($ult1, 'BORRAR'), $ult1);
+prueba('catálogo CSV: la fila sin precio se ignora', !str_contains(file_get_contents($tmp . '/app2/estado/chat_34611000222.json'), 'Sin precio'));
+post($tmp, $puertoIA, $secreto, msg('wamid.H1', 'text', 'borrar', '34611000222'));
+$cap = capturados($tmp);
+prueba('BORRAR elimina la conversación', str_contains(end($cap)['text']['body'] ?? '', 'He borrado') && !is_file($tmp . '/app2/estado/chat_34611000222.json'));
 
 echo "Registro\n";
 prueba('log.txt existe y registra envíos', is_file($tmp . '/app/log.txt') && str_contains(file_get_contents($tmp . '/app/log.txt'), 'HTTP 200'));
