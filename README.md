@@ -11,6 +11,9 @@ Guía completa por fases: [PLAYBOOK.md](PLAYBOOK.md).
 - `tests/run.php`: pruebas automáticas con Meta y Anthropic falsos, sin red real.
 - `bot.js`, `test.js`: prototipo del flujo (`node test.js`).
 
+## Empezar (con Claude)
+Abre esta carpeta con Claude Code y di: "monta mi WhatsApp con este repo". Claude sigue `CLAUDE.md` y te guía. Las claves las escribes tú con `php setup.php`; Claude no las ve.
+
 ## Probar
 ```bash
 php tests/run.php
