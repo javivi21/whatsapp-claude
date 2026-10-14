@@ -1,0 +1,7 @@
+config.php
+config_asistente.php
+log.txt
+estado/
+reservas.jsonl
+*.env
+.env

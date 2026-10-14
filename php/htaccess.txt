@@ -1,0 +1,8 @@
+# Nada de datos accesible desde fuera; solo webhook.php
+<FilesMatch "\.(txt|jsonl|json|php)$">
+  Require all denied
+</FilesMatch>
+<Files "webhook.php">
+  Require all granted
+</Files>
+Options -Indexes
